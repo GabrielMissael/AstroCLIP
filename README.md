@@ -212,6 +212,36 @@ https://app.globus.org/file-manager?origin_id=9fb0fc0e-e760-11ec-9bd2-2d2219dcc1
 
 The directory is organized into south and north surveys, where each survey is split into chunks of 1,000,000 galaxies (sorted by decreasing z-band flux) and saved in hdf5 format. For more details, see [here](https://github.com/georgestein/ssl-legacysurvey/tree/main).
 
+### Processing Legacy Survey Images Directly
+
+If you want to run AstroCLIP on DESI Legacy Survey cutouts that aren’t part of the premade dataset, you only need two preprocessing steps on the g, r, z bands:
+
+1. Center-crop each cutout to 144×144 pixels.
+2. Convert the cropped 3-band tensor to display-ready RGB using the `decals_to_rgb` transform below (applied on the g,r,z channels).
+
+The function is defined below:
+```python
+RGB_SCALES = {
+    "u": (2, 1.5),
+    "g": (2, 6.0),
+    "r": (1, 3.4),
+    "i": (0, 1.0),
+    "z": (0, 2.2),
+}
+
+def decals_to_rgb(image, bands=["g", "r", "z"], scales=None, m=0.03, Q=20.0):
+    axes, scales = zip(*[RGB_SCALES[bands[i]] for i in range(len(bands))])
+    scales = [scales[i] for i in axes]
+    image = image.movedim(1, -1).flip(-1)
+    scales = torch.tensor(scales, dtype=torch.float32).to(image.device)
+    I = torch.sum(torch.clamp(image * scales + m, min=0), dim=-1) / len(bands)
+    fI = torch.arcsinh(Q * I) / np.sqrt(Q)
+    I += (I == 0.0) * 1e-6
+    image = (image * scales + m) * (fI / I).unsqueeze(-1)
+    image = torch.clamp(image, 0, 1)
+    return image.movedim(-1, 1)
+```
+which expects just the g,r,z bands from the Legacy Survey image.
 
 ## Pretraining
 
