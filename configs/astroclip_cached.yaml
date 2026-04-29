@@ -43,8 +43,11 @@ model:
 data:
   class_path: astroclip.data.cached_datamodule.CachedAstroClipDataloader
   init_args:
-    train_path: null
-    val_path: null
+    data_path: null
+    train_start: null
+    train_stop: null
+    val_start: null
+    val_stop: null
     batch_size: 2048
     num_workers: 2
     drop_last: true

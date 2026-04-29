@@ -6,26 +6,21 @@ from bisect import bisect_right
 from pathlib import Path
 
 class CachedTokenDataset(Dataset):
-    def __init__(self, path: str):
+    def __init__(self, path: str, start: int, stop: int):
         self.path = Path(path)
-        self.shards = self._find_shards()
+        self.shards = sorted(self.path.glob("*.h5"))
         self.lengths = [self._read_length(shard) for shard in self.shards]
         self.starts = []
 
-        total = 0
+        self.full_total = 0
         for length in self.lengths:
-            self.starts.append(total)
-            total += length
+            self.starts.append(self.full_total)
+            self.full_total += length
 
-        self.total = total
+        self.start = start
+        self.stop = stop
+        self.total = self.stop - self.start
         self._files = {}
-
-    def _find_shards(self):
-        if self.path.is_file():
-            shards = [self.path]
-        else:
-            shards = sorted(self.path.glob("*.h5"))
-        return shards
 
     @staticmethod
     def _read_length(shard):
@@ -52,6 +47,7 @@ class CachedTokenDataset(Dataset):
             index += self.total
         if index < 0 or index >= self.total:
             raise IndexError(index)
+        index += self.start
         shard_index = bisect_right(self.starts, index) - 1
         local_index = index - self.starts[shard_index]
         file = self._file(shard_index)
@@ -73,8 +69,11 @@ class CachedTokenDataset(Dataset):
 class CachedAstroClipDataloader(L.LightningDataModule):
     def __init__(
         self,
-        train_path: str,
-        val_path: str,
+        data_path: str,
+        train_start: int,
+        train_stop: int,
+        val_start: int,
+        val_stop: int,
         batch_size: int = 2048,
         num_workers: int = 2,
         drop_last: bool = True,
@@ -84,8 +83,16 @@ class CachedAstroClipDataloader(L.LightningDataModule):
         self.save_hyperparameters()
 
     def setup(self, stage: str) -> None:
-        self.train_dataset = CachedTokenDataset(self.hparams.train_path)
-        self.val_dataset = CachedTokenDataset(self.hparams.val_path)
+        self.train_dataset = CachedTokenDataset(
+            self.hparams.data_path,
+            start=self.hparams.train_start,
+            stop=self.hparams.train_stop,
+        )
+        self.val_dataset = CachedTokenDataset(
+            self.hparams.data_path,
+            start=self.hparams.val_start,
+            stop=self.hparams.val_stop,
+        )
 
     def train_dataloader(self):
         return DataLoader(
