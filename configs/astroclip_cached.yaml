@@ -41,17 +41,18 @@ model:
         model_embed_dim: 768
         dropout: 0.1
 data:
-  class_path: astroclip.data.cached_datamodule.CachedAstroClipDataloader
+  class_path: astroclip.data.cached_datamodule.CachedAstroClipBatchDataloader
   init_args:
     data_path: null
     train_start: null
     train_stop: null
     val_start: null
     val_stop: null
-    batch_size: 2048
+    batch_size: 1024
     num_workers: 2
     drop_last: true
     pin_memory: true
+    shuffle: true
 optimizer:
   class_path: torch.optim.adamw.AdamW
   init_args:
