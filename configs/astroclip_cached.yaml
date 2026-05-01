@@ -53,6 +53,8 @@ data:
     drop_last: true
     pin_memory: true
     shuffle: true
+    prefetch_factor: 1
+    persistent_workers: true
 optimizer:
   class_path: torch.optim.adamw.AdamW
   init_args:

@@ -243,33 +243,56 @@ class CachedAstroClipBatchDataloader(L.LightningDataModule):
         drop_last: bool = True,
         pin_memory: bool = False,
         shuffle: bool = True,
+        prefetch_factor: int = 1,
+        persistent_workers: bool = True,
     ):
         super().__init__()
         self.save_hyperparameters()
+        self.data_path = data_path
+        self.train_start = train_start
+        self.train_stop = train_stop
+        self.val_start = val_start
+        self.val_stop = val_stop
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.drop_last = drop_last
+        self.pin_memory = pin_memory
+        self.shuffle = shuffle
+        self.prefetch_factor = prefetch_factor
+        self.persistent_workers = persistent_workers
 
     def setup(self, stage: str) -> None:
         self.train_dataset = CachedTokenBatchDataset(
-            self.hparams.data_path,
-            start=self.hparams.train_start,
-            stop=self.hparams.train_stop,
-            batch_size=self.hparams.batch_size,
-            drop_last=self.hparams.drop_last,
+            self.data_path,
+            start=self.train_start,
+            stop=self.train_stop,
+            batch_size=self.batch_size,
+            drop_last=self.drop_last,
         )
         self.val_dataset = CachedTokenBatchDataset(
-            self.hparams.data_path,
-            start=self.hparams.val_start,
-            stop=self.hparams.val_stop,
-            batch_size=self.hparams.batch_size,
-            drop_last=self.hparams.drop_last,
+            self.data_path,
+            start=self.val_start,
+            stop=self.val_stop,
+            batch_size=self.batch_size,
+            drop_last=self.drop_last,
         )
+
+    def _loader_kwargs(self):
+        kwargs = {
+            "num_workers": self.num_workers,
+            "pin_memory": self.pin_memory,
+        }
+        if self.num_workers > 0:
+            kwargs["prefetch_factor"] = self.prefetch_factor
+            kwargs["persistent_workers"] = self.persistent_workers
+        return kwargs
 
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
             batch_size=None,
-            shuffle=self.hparams.shuffle,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
+            shuffle=self.shuffle,
+            **self._loader_kwargs(),
         )
 
     def val_dataloader(self):
@@ -277,6 +300,5 @@ class CachedAstroClipBatchDataloader(L.LightningDataModule):
             self.val_dataset,
             batch_size=None,
             shuffle=False,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
+            **self._loader_kwargs(),
         )
