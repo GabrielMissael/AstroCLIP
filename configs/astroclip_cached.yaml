@@ -14,7 +14,8 @@ trainer:
         save_top_k: -1
         every_n_epochs: 1
         monitor: "val_loss_nologit"
-        filename: "epoch-{epoch:03d}-{val_loss_nologit:.4f}"
+        auto_insert_metric_name: false
+        filename: "epoch-{epoch:03d}"
   logger:
     class_path: lightning.pytorch.loggers.CSVLogger
     init_args:
@@ -29,14 +30,14 @@ model:
     image_encoder:
       class_path: astroclip.models.astroclip.CachedImageHead
       init_args:
-        embed_dim: 1024
+        embed_dim: 512
         n_head: 4
         model_embed_dim: 1024
         dropout: 0.1
     spectrum_encoder:
       class_path: astroclip.models.astroclip.CachedSpectrumHead
       init_args:
-        embed_dim: 1024
+        embed_dim: 512
         n_head: 4
         model_embed_dim: 768
         dropout: 0.1
@@ -59,7 +60,7 @@ optimizer:
   class_path: torch.optim.adamw.AdamW
   init_args:
     lr: 1e-4
-    weight_decay: 0.05
+    weight_decay: 0.01
 lr_scheduler:
   class_path: astroclip.CosineAnnealingWithWarmupLR
   init_args:
