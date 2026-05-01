@@ -43,6 +43,8 @@ class AstroClipModel(L.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters()
+        self.temperature = temperature
+        self.loss_logit_scale = logit_scale
 
         # Define the image and spectrum encoder
         self.image_encoder = image_encoder
@@ -80,10 +82,10 @@ class AstroClipModel(L.LightningModule):
 
         # Calculate the CLIP loss
         loss_withlogit = self.criterion(
-            image_features, spectrum_features, self.hparams.temperature
+            image_features, spectrum_features, self.temperature
         )
         loss_nologit = self.criterion(
-            image_features, spectrum_features, self.hparams.logit_scale
+            image_features, spectrum_features, self.loss_logit_scale
         )
 
         # Log the losses
@@ -103,10 +105,10 @@ class AstroClipModel(L.LightningModule):
 
         # Calculate the CLIP loss
         val_loss_nologit = self.criterion(
-            image_features, spectrum_features, self.hparams.logit_scale
+            image_features, spectrum_features, self.loss_logit_scale
         )
         val_loss_withlogit = self.criterion(
-            image_features, spectrum_features, self.hparams.temperature
+            image_features, spectrum_features, self.temperature
         )
 
         # Log the losses
@@ -320,7 +322,7 @@ class SpectrumHead(nn.Module):
         """
         super().__init__()
         # Load the model from the checkpoint
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, weights_only=False)
         self.backbone = SpecFormer(**checkpoint["hyper_parameters"])
         if load_pretrained_weights:
             self.backbone.load_state_dict(checkpoint["state_dict"])
