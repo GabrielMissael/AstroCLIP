@@ -247,7 +247,6 @@ class CachedAstroClipBatchDataloader(L.LightningDataModule):
         persistent_workers: bool = True,
     ):
         super().__init__()
-        self.save_hyperparameters()
         self.data_path = data_path
         self.train_start = train_start
         self.train_stop = train_stop
