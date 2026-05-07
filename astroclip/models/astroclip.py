@@ -43,6 +43,8 @@ class AstroClipModel(L.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters()
+        self.temperature = temperature
+        self.loss_logit_scale = logit_scale
 
         # Define the image and spectrum encoder
         self.image_encoder = image_encoder
@@ -80,10 +82,10 @@ class AstroClipModel(L.LightningModule):
 
         # Calculate the CLIP loss
         loss_withlogit = self.criterion(
-            image_features, spectrum_features, self.hparams.temperature
+            image_features, spectrum_features, self.temperature
         )
         loss_nologit = self.criterion(
-            image_features, spectrum_features, self.hparams.logit_scale
+            image_features, spectrum_features, self.loss_logit_scale
         )
 
         # Log the losses
@@ -103,10 +105,10 @@ class AstroClipModel(L.LightningModule):
 
         # Calculate the CLIP loss
         val_loss_nologit = self.criterion(
-            image_features, spectrum_features, self.hparams.logit_scale
+            image_features, spectrum_features, self.loss_logit_scale
         )
         val_loss_withlogit = self.criterion(
-            image_features, spectrum_features, self.hparams.temperature
+            image_features, spectrum_features, self.temperature
         )
 
         # Log the losses
@@ -153,6 +155,66 @@ class CLIPLoss(nn.Module):
         ) / 2
         return {"contrastive_loss": total_loss} if output_dict else total_loss
 
+class CachedImageHead(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int = 1024,
+        n_head: int = 4,
+        model_embed_dim: int = 1024,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.cross_attention = CrossAttentionHead(
+            embed_dim=embed_dim,
+            n_head=n_head,
+            model_embed_dim=model_embed_dim,
+            dropout=dropout,
+        )
+        self.mlp = MLP(
+            in_features=embed_dim,
+            hidden_features=4 * embed_dim,
+            dropout=dropout,
+        )
+
+    def forward(self, tokens: torch.Tensor, return_weights: bool = False):
+        x, attentions = self.cross_attention(tokens)
+        x = self.mlp(x)
+
+        if return_weights:
+            return x.squeeze(), attentions[1]
+
+        return x.squeeze()
+
+
+class CachedSpectrumHead(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int = 1024,
+        n_head: int = 4,
+        model_embed_dim: int = 768,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.cross_attention = CrossAttentionHead(
+            embed_dim=embed_dim,
+            n_head=n_head,
+            model_embed_dim=model_embed_dim,
+            dropout=dropout,
+        )
+        self.mlp = MLP(
+            in_features=embed_dim,
+            hidden_features=4 * embed_dim,
+            dropout=dropout,
+        )
+
+    def forward(self, tokens: torch.Tensor, return_weights: bool = False):
+        x, attentions = self.cross_attention(tokens)
+        x = x + self.mlp(x)
+
+        if return_weights:
+            return x.squeeze(), attentions[1]
+
+        return x.squeeze()
 
 class ImageHead(nn.Module):
     def __init__(
@@ -260,7 +322,7 @@ class SpectrumHead(nn.Module):
         """
         super().__init__()
         # Load the model from the checkpoint
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, weights_only=False)
         self.backbone = SpecFormer(**checkpoint["hyper_parameters"])
         if load_pretrained_weights:
             self.backbone.load_state_dict(checkpoint["state_dict"])

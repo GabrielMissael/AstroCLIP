@@ -1,2 +1,3 @@
+from .cached_datamodule import CachedAstroClipBatchDataloader, CachedAstroClipDataloader
 from .datamodule import AstroClipCollator, AstroClipDataloader
 from .dataset import AstroClipDataset
